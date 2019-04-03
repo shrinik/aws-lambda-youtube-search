@@ -1,10 +1,11 @@
+using Amazon.Lambda.APIGatewayEvents;
 using Amazon.Lambda.Core;
 using Google.Apis.Services;
 using Google.Apis.YouTube.v3;
 using Google.Apis.YouTube.v3.Data;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.Json.JsonSerializer))]
@@ -15,6 +16,7 @@ namespace YouTubeVideoSearch
     {
         private static readonly string YOUTUBE_VIDEO_URL_BASE = "https://www.youtube.com/watch?v=";
         private static string _apiKey;
+        private static int _maxResults;
         private static YouTubeService _service;
 
         /// <summary>
@@ -23,9 +25,10 @@ namespace YouTubeVideoSearch
         /// <param name="input"></param>
         /// <param name="context"></param>
         /// <returns></returns>
-        public async Task<IList<Video>> FunctionHandler(string input, ILambdaContext context)
+        public APIGatewayProxyResponse FunctionHandler(APIGatewayProxyRequest apigProxyEvent, ILambdaContext context)
         {
             _apiKey = Environment.GetEnvironmentVariable("YoutubeApiKey");
+            _maxResults = int.Parse(Environment.GetEnvironmentVariable("MaxResults"));
             _service = new YouTubeService(
                 new BaseClientService.Initializer()
                 {
@@ -33,19 +36,31 @@ namespace YouTubeVideoSearch
                     ApiKey = _apiKey
                 }
             );
-            return await GetSearchResults(input);
+            var body = "No query was found in request";
+            // Check existence of search parameter
+            if (apigProxyEvent.QueryStringParameters.ContainsKey("query"))
+            {
+                var output = GetSearchResults(apigProxyEvent.QueryStringParameters["query"]);
+                body = JsonConvert.SerializeObject(output);
+            }
+
+            return new APIGatewayProxyResponse
+            {
+                Body = body,
+                StatusCode = 200,
+            };
         }
 
-        private static async Task<IList<Video>> GetSearchResults(string input)
+        private static IList<Video> GetSearchResults(string input)
         {
             var listRequest = _service.Search.List("snippet");
-            listRequest.MaxResults = 5;
+            listRequest.MaxResults = _maxResults;
             listRequest.PrettyPrint = true;
             listRequest.Q = input;
             listRequest.Type = "video";
             listRequest.Fields = "items(id/videoId,snippet(description,title))";
 
-            var listResponse = await listRequest.ExecuteAsync();
+            var listResponse = listRequest.Execute();
             return FormatSearchResults(listResponse);
         }
 

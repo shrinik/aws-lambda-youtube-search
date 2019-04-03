@@ -16,5 +16,5 @@
   "function-name": "SearchYouTube",
   "function-role": "arn:aws:iam::193932308446:role/service-role/MyLambdaRole",
   "tracing-mode": "PassThrough",
-  "environment-variables": "\"YoutubeApiKey\"=\"NotaRealKey\""
+  "environment-variables": "\"YoutubeApiKey\"=\"XXXX\";\"MaxResults\"=\"5\""
 }
